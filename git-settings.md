@@ -117,7 +117,12 @@ $ git config --global core.safecrlf true
 ### Shift_JISを扱う場合
 vscodeでそのフォルダ全体をshiftjisにするには、`Command + ,` で設定 -> ワークスペース からShift JISを選択。
 
-また、`git diff`で文字化けしないように.gitattributesで以下を設定
+`git diff`で文字化けしないように、.gitattributesに以下を記述。
 ```
-*       diff=cp932
+*       diff=sjis
 ```
+さらに
+```
+$ git config --local diff.sjis.textconv "iconv -f sjis"
+```
+これは、Windows, Macどちらでも設定が必要。この設定はglobalでもよい。
