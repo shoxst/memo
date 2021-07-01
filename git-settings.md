@@ -4,7 +4,7 @@
 ### 改行コード
 |  OS  |  名称  | 正規表現 | 16進表記 |
 | ----         | ----    | ---  | --- |
-|  Windows     |  CR+LF  | \r\n | 0x0d0a
+|  Windows     |  CRLF  | \r\n | 0x0d0a
 |  Mac / Linux  |  LF     | \n   | 0x0a
 
 ## config
@@ -33,7 +33,7 @@
 作業ディレクトリ上のファイルに使用する改行コード。lf, crlf, nativeの3通りでデフォルトはnative。通常は変更する必要なし。
 
 ### `core.autocrlf`
-作業ディレクトリとリポジトリの間でCRLFとLFの変換を行うかどうか。よくcommit時に変換と説明されているが、blob objectつくるタイミングならaddするタイミング?
+作業ディレクトリとリポジトリの間でCRLFとLFの変換を行うかどうか。よくcommit時に変換と説明されるが、変換が行われるのはblob objectがつくられるタイミングなので、addするとき。
 - true
   - 作業ディレクトリ -> リポジトリ で CRLF -> LF、リポジトリ -> 作業ディレクトリ で LF -> CRLFの変換を行う
 - input
@@ -42,7 +42,13 @@
   - どちらもなし
 
 ### `core.safecrlf`
-改行コードが混在している場合に変換しないオプション。
+CRLF -> LFの不可逆的な変換を拒否・警告できるオプション。例えば、`coreautocrlf=input`のときに変換を行おうとしているときや、改行コードが混在しているファイルに対して変換するとき。後者はバイナリファイルに対する誤った変換を防止できる。
+- true
+  - 不可逆的な変換に対して、コマンドを拒否する。
+- warn
+  - 不可逆的な変換に対して、警告を出してコマンドを実行する。
+- false
+  - 不可逆的な変換に対して、コマンドを実行する。
 
 ### `core.whitespace`
 `cr-at-eol`を設定しておくと、改行コードCRLFのファイルを`git diff`したときに`^M`の表示を抑止することができる。
@@ -126,3 +132,63 @@ vscodeでそのフォルダ全体をshiftjisにするには、`Command + ,` で�
 $ git config --local diff.sjis.textconv "iconv -f sjis"
 ```
 これは、Windows, Macどちらでも設定が必要。この設定はglobalでもよい。
+
+## 検証
+### `core.autocrlf = true`の場合
+```
+$ git config core.autocrlf
+true
+$ git config core.safecrlf
+true
+```
+のときに、改行コードCRLFの`a.txt`
+```
+hello
+
+```
+を`git add`すると、ハッシュ値
+```
+ce013625030ba8dba906f756967f9e9ca394464a
+```
+のblob objectが作成される。中を見ると
+```
+b'blob 6\x00hello\n'
+```
+なので、LFに変換されていることがわかる。
+
+### `core.autocrlf = input`の場合
+```
+$ git config core.autocrlf
+input
+$ git config core.safecrlf
+true
+```
+のときに、同じファイルを`git add`すると、
+```
+$ git add a.txt
+fatal: CRLF would be replaced by LF in a.txt
+```
+となり失敗する。これは、`core.autocrlf = input`はリポジトリから取り出すときの変換を行わないので、`core.safecrlf`の設定によって不可逆的な変換が拒否されているため。
+```
+$ git config core.safecrlf false
+```
+にするとaddされ、ハッシュ値
+```
+ce013625030ba8dba906f756967f9e9ca394464a
+```
+のblob objectが作成、すなわちLFに変換されている。
+
+### `core.autocrlf = false`の場合
+```
+$ git config core.autocrlf
+false
+```
+のときは、`git add`すると上の2つとはハッシュ値が変わり
+```
+ef0493b275aa2080237f676d2ef6559246f56636
+```
+となる。中を見ると
+```
+b'blob 7\x00hello\r\n'
+```
+となり、改行コードCRLFのまま保存されていることがわかる。
